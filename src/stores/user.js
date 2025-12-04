@@ -17,6 +17,7 @@ export const useUserStore = defineStore('user', () => {
   // 设置用户信息
   function setUser(user) {
     userInfo.value = user
+    localStorage.setItem('userInfo', JSON.stringify(user));
   }
 
   // 设置 Token
@@ -27,9 +28,10 @@ export const useUserStore = defineStore('user', () => {
 
   // 登出
   function logout() {
-    userInfo.value = {}
+    userInfo.value = { id: null, nickname: '', email: '', avatar: '' }
     token.value = ''
     localStorage.removeItem('token')
+    localStorage.removeItem('userInfo')
   }
 
   return { userInfo, token, setUser, setToken, logout }

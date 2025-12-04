@@ -42,19 +42,19 @@
 <script setup>
 import { reactive, ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
-// import { registerUser } from '@/api/chat'; // 预留接口引入
+// 1. 取消注释，引入真实接口
+import { registerUser } from '@/api/chat'; 
 
 const router = useRouter();
 const loading = ref(false);
 const confirmPassword = ref('');
 
 const form = reactive({
-  username: '',
+  email: '',    // 确保字段名是 email
   nickname: '',
   password: ''
 });
 
-// 计算属性：检查密码是否一致
 const passwordMismatch = computed(() => {
   return form.password && confirmPassword.value && form.password !== confirmPassword.value;
 });
@@ -64,19 +64,22 @@ const handleRegister = async () => {
   
   loading.value = true;
   try {
-    // 模拟注册请求
-    // await registerUser(form);
+    console.log('正在提交注册:', form);
     
-    console.log('注册信息提交:', form);
+    // 2. 调用真实后端接口
+    const res = await registerUser(form);
     
-    // 模拟延迟
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    alert('注册成功！请登录');
-    router.push('/login');
+    // 后端 AuthController 返回结构: { code: 200, msg: "注册成功" }
+    if (res.code === 200) {
+      alert('注册成功！请登录');
+      router.push('/login');
+    } else {
+      alert('注册失败: ' + (res.msg || '未知错误'));
+    }
     
   } catch (error) {
-    alert('注册失败: ' + (error.message || '请稍后重试'));
+    console.error(error);
+    alert('注册请求失败，请检查网络或后端服务');
   } finally {
     loading.value = false;
   }

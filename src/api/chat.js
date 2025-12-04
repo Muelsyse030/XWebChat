@@ -12,8 +12,15 @@ api.interceptors.request.use(config => {
   return config;
 });
 
+api.interceptors.response.use(
+  response => response.data,
+  error => Promise.reject(error)
+);
+
 export const loginUser = (data) => api.post('/login', data);
 export const getContacts = () => api.get('/contacts');
+
+export const registerUser = (data) => api.post('/register', data);
 export const getHistory = (contactId) => api.get(`/messages?contactId=${contactId}`);
 
 export default api;
