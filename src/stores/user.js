@@ -1,32 +1,30 @@
-// src/stores/user.js
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useUserStore = defineStore('user', () => {
-  // 用户信息
-  const userInfo = ref({
+  // 1. 修改：初始化时尝试从 localStorage 读取
+  const savedUser = localStorage.getItem('userInfo')
+  const userInfo = ref(savedUser ? JSON.parse(savedUser) : {
     id: null,
     nickname: '',
     email: '',
     avatar: ''
   })
   
-  // Token
   const token = ref(localStorage.getItem('token') || '')
 
-  // 设置用户信息
+  // 2. 修改：设置时同步写入 localStorage
   function setUser(user) {
     userInfo.value = user
-    localStorage.setItem('userInfo', JSON.stringify(user));
+    localStorage.setItem('userInfo', JSON.stringify(user))
   }
 
-  // 设置 Token
   function setToken(newToken) {
     token.value = newToken
     localStorage.setItem('token', newToken)
   }
 
-  // 登出
+  // 3. 修改：登出时清除
   function logout() {
     userInfo.value = { id: null, nickname: '', email: '', avatar: '' }
     token.value = ''
