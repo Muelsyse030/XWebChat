@@ -30,11 +30,18 @@
 <script setup>
 import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
-// import { loginUser } from '@/api/chat'; // 实际使用时解开注释
+import { loginUser } from '@/api/chat'; // 引入 API
+import { useUserStore } from '@/stores/user'; // 引入 Pinia
 
 const router = useRouter();
+const userStore = useUserStore(); // 使用 store
 const loading = ref(false);
-const form = reactive({ username: '', password: '' });
+
+const form = reactive({ 
+    email: '', // 后端是 findByEmail，所以这里要是 email
+    password: '' 
+});
+
 const goToRegister = () => {
   router.push('/register');
 };
@@ -42,15 +49,22 @@ const goToRegister = () => {
 const handleLogin = async () => {
   loading.value = true;
   try {
-    // 模拟登录请求
-    // const res = await loginUser(form);
-    // localStorage.setItem('token', res.data.token);
-    console.log('登录成功', form);
-    setTimeout(() => {
-      router.push('/chat'); // 跳转到聊天页
-    }, 1000);
+    // 1. 调用真实接口
+    const res = await loginUser(form);
+    
+    if (res.code === 200) {
+        // 2. 保存 Token 和用户信息到 Pinia/LocalStorage
+        userStore.setToken(res.token);
+        userStore.setUser(res.userInfo);
+        
+        console.log('登录成功', res.userInfo);
+        router.push('/chat'); 
+    } else {
+        alert(res.msg || '登录失败');
+    }
   } catch (error) {
-    alert('登录失败');
+    console.error(error);
+    alert('登录请求失败');
   } finally {
     loading.value = false;
   }
