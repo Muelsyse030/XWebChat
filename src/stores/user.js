@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useUserStore = defineStore('user', () => {
-  // 1. 修改：初始化时尝试从 localStorage 读取
+  // 核心修改：初始化时尝试从 localStorage 读取 userInfo
   const savedUser = localStorage.getItem('userInfo')
   const userInfo = ref(savedUser ? JSON.parse(savedUser) : {
     id: null,
@@ -13,7 +13,7 @@ export const useUserStore = defineStore('user', () => {
   
   const token = ref(localStorage.getItem('token') || '')
 
-  // 2. 修改：设置时同步写入 localStorage
+  // 这里的修改你之前做对了，但需要配合上面的初始化读取才有效
   function setUser(user) {
     userInfo.value = user
     localStorage.setItem('userInfo', JSON.stringify(user))
@@ -24,7 +24,6 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem('token', newToken)
   }
 
-  // 3. 修改：登出时清除
   function logout() {
     userInfo.value = { id: null, nickname: '', email: '', avatar: '' }
     token.value = ''

@@ -1,6 +1,5 @@
 <template>
   <div class="chat-background">
-    
     <div class="chat-card">
       
       <aside class="sidebar">
@@ -20,9 +19,9 @@
             :class="{ active: currentContact?.id === user.id }"
             @click="selectContact(user)"
           >
-            <div class="avatar-small">{{ user.name.charAt(0) }}</div>
+            <div class="avatar-small">{{ user.nickname ? user.nickname.charAt(0) : 'U' }}</div>
             <div class="info">
-              <div class="name">{{ user.name }}</div>
+              <div class="name">{{ user.nickname }}</div>
               <div class="last-msg">点击开始聊天...</div>
             </div>
           </div>
@@ -32,7 +31,7 @@
       <main class="chat-area">
         <template v-if="currentContact">
           <header class="chat-header">
-            <h3>{{ currentContact.name }}</h3>
+            <h3>{{ currentContact.nickname }}</h3>
           </header>
 
           <div class="message-list" ref="msgContainer">
@@ -66,36 +65,34 @@
         </div>
       </main>
       
-    </div> </div> </template>
+    </div> 
+  </div> 
+</template>
 
 <script setup>
 import { ref, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
-import { Axios } from 'axios';
-import { getContacts } from '@/api/chat'; // 引入接口
+import { getContacts } from '@/api/chat'; 
 
 const userStore = useUserStore();
 const router = useRouter();
 let socket = null;
 
-// 数据定义
-const contacts = ref([]); // 初始化为空
+const contacts = ref([]); 
 const currentContact = ref(null);
 const messages = ref([]);
 const inputContent = ref('');
 const msgContainer = ref(null);
 
-// 1. 初始化 WebSocket
 const initWebSocket = () => {
-  const token = userStore.token; // 从 Pinia 获取 token
+  const token = userStore.token; 
   if (!token) {
       alert("未登录");
       router.push('/login');
       return;
   }
 
-  // 确保地址正确
   socket = new WebSocket(`ws://localhost:8080/ws/chat?token=${token}`);
 
   socket.onopen = () => {
@@ -105,8 +102,6 @@ const initWebSocket = () => {
   socket.onmessage = (event) => {
     const msg = JSON.parse(event.data);
     
-    // 如果当前正在和发送者聊天，或者是我自己发的消息（多端同步）
-    // 注意：后端返回结构是 { content: "...", senderId: "..." }
     const isCurrentChat = currentContact.value && 
                           (String(msg.senderId) === String(currentContact.value.id));
     
@@ -123,12 +118,10 @@ const initWebSocket = () => {
   socket.onclose = () => { console.log('连接断开'); };
 };
 
-// 2. 加载联系人列表
 const loadContacts = async () => {
     try {
         const res = await getContacts();
         if (res.code === 200) {
-            // 过滤掉自己
             contacts.value = res.data.filter(u => u.id !== userStore.userInfo.id);
         }
     } catch (e) {
@@ -138,10 +131,12 @@ const loadContacts = async () => {
 
 const selectContact = (user) => {
   currentContact.value = user;
-  // 切换联系人时清空消息，或者你需要调用后端接口获取历史消息
-  // messages.value = []; 
-  // 暂时模拟保留一些消息，实际应调用 api.getHistory(user.id)
-  messages.value = []; 
+  messages.value = [
+    // 修复点4：使用 nickname
+    { id: 1, content: `Hi, I am ${user.nickname}`, isMine: false },
+    { id: 2, content: 'Hello there!', isMine: true }
+  ];
+  scrollToBottom();
 };
 
 const sendMessage = () => {
@@ -152,10 +147,8 @@ const sendMessage = () => {
     content: inputContent.value
   };
   
-  // 发送给后端
   socket.send(JSON.stringify(msgObj));
   
-  // 本地立即上屏
   messages.value.push({
     id: Date.now(),
     content: inputContent.value,
@@ -166,15 +159,25 @@ const sendMessage = () => {
   scrollToBottom();
 };
 
-// ... 其他辅助函数保持不变 ...
+const goToProfile = () => {
+  router.push('/profile');
+};
+
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (msgContainer.value) {
+      msgContainer.value.scrollTop = msgContainer.value.scrollHeight;
+    }
+  });
+};
 
 onMounted(() => {
     if (!userStore.token) {
         router.push('/login');
         return;
     }
-    loadContacts(); // 加载用户列表
-    initWebSocket(); // 连接 WS
+    loadContacts(); 
+    initWebSocket(); 
 });
 </script>
 
