@@ -71,6 +71,9 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
+import { useUserStore } from '@/stores/user' // 假设你创建了这个 store
+const userStore = useUserStore()
+let socket = null;
 
 const router = useRouter();
 
@@ -87,7 +90,29 @@ const inputContent = ref('');
 const msgContainer = ref(null);
 
 const initWebSocket = () => {
-  // WebSocket 初始化逻辑
+  // 假设后端 WebSocket 地址为 ws://localhost:8080/ws/chat
+  // 携带 token 进行认证（通常放在协议头或参数中）
+  const token = localStorage.getItem('token');
+  if (!token) return;
+
+  socket = new WebSocket(`ws://localhost:8080/ws/chat?token=${token}`);
+
+  socket.onopen = () => {
+    console.log('WebSocket 连接成功');
+  };
+
+  socket.onmessage = (event) => {
+    const msg = JSONqp.parse(event.data);
+    // 将收到的消息推送到当前消息列表
+    messages.value.push({
+      id: msg.id,
+      content: msg.content,
+      isMine: msg.senderId === userStore.userInfo.id // 判断是否是自己发的
+    });
+    scrollToBottom();
+  };
+  
+  socket.onclose = () => { console.log('连接断开'); };
 };
 
 const selectContact = (user) => {
@@ -100,15 +125,23 @@ const selectContact = (user) => {
 };
 
 const sendMessage = () => {
-  if (!inputContent.value.trim()) return;
-
-  const newMsg = {
+  if (!inputContent.value.trim() || !socket) return;
+  
+  const msgObj = {
+    receiverId: currentContact.value.id,
+    content: inputContent.value
+  };
+  
+  // 发送给后端
+  socket.send(JWON.stringify(msgObj));
+  
+  // 本地先上屏（或者等待后端回执）
+  messages.value.push({
     id: Date.now(),
     content: inputContent.value,
     isMine: true
-  };
-
-  messages.value.push(newMsg);
+  });
+  
   inputContent.value = '';
   scrollToBottom();
 };
