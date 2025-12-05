@@ -1,12 +1,22 @@
 <template>
   <div class="chat-background">
+    
     <div class="chat-card">
       
       <aside class="sidebar">
         <div class="user-profile" @click="goToProfile" title="点击修改个人信息">
-          <div class="avatar">Me</div>
+          <img 
+            v-if="userStore.userInfo.avatar" 
+            :src="userStore.userInfo.avatar" 
+            class="avatar" 
+            style="object-fit: cover;" 
+          />
+          <div v-else class="avatar">
+            {{ userStore.userInfo.nickname ? userStore.userInfo.nickname.charAt(0).toUpperCase() : 'Me' }}
+          </div>
+
           <div class="user-info-text">
-            <span class="username">我的账号</span>
+            <span class="username">{{ userStore.userInfo.nickname || '我的账号' }}</span>
             <span class="status-text">● 在线</span>
           </div>
         </div>
@@ -19,7 +29,16 @@
             :class="{ active: currentContact?.id === user.id }"
             @click="selectContact(user)"
           >
-            <div class="avatar-small">{{ user.nickname ? user.nickname.charAt(0) : 'U' }}</div>
+            <img 
+              v-if="user.avatar" 
+              :src="user.avatar" 
+              class="avatar-small" 
+              style="object-fit: cover;" 
+            />
+            <div v-else class="avatar-small">
+              {{ user.nickname ? user.nickname.charAt(0).toUpperCase() : 'U' }}
+            </div>
+
             <div class="info">
               <div class="name">{{ user.nickname }}</div>
               <div class="last-msg">点击开始聊天...</div>
@@ -31,7 +50,13 @@
       <main class="chat-area">
         <template v-if="currentContact">
           <header class="chat-header">
-            <h3>{{ currentContact.nickname }}</h3>
+            <div class="header-name-wrapper">
+              <h3>{{ currentContact.nickname }}</h3>
+              
+              <span class="status-badge" :class="{ 'is-online': currentContact.online }">
+                {{ currentContact.online ? '● 在线' : '● 离线' }}
+              </span>
+            </div>
           </header>
 
           <div class="message-list" ref="msgContainer">
@@ -410,6 +435,31 @@ textarea:focus {
   flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ccc;
 }
 .empty-icon { font-size: 48px; margin-bottom: 10px; opacity: 0.5; }
+
+.header-name-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* 名字和状态之间的间距 */
+}
+
+.status-badge {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background-color: #f0f0f0; /* 默认离线背景：灰色 */
+  color: #999;               /* 默认离线文字：深灰 */
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.status-badge.is-online {
+  background-color: #e6f7ff; /* 在线背景：浅蓝 */
+  color: #1890ff;            /* 在线文字：亮蓝 */
+  /* 或者用绿色风格：
+  background-color: #f6ffed;
+  color: #52c41a; 
+  */
+}
 
 /* 滚动条 */
 ::-webkit-scrollbar { width: 6px; }

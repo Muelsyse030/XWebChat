@@ -21,9 +21,13 @@
         </div>
 
         <form @submit.prevent="handleSave">
+          <div class="form-group" style="display:none">
+             <input type="text" v-model="form.id" />
+          </div>
+
           <div class="form-group">
-            <label>账号 (不可修改)</label>
-            <input type="text" v-model="form.username" disabled class="input-disabled" />
+            <label>邮箱 (账号)</label>
+            <input type="email" v-model="form.email" disabled class="input-disabled" />
           </div>
 
           <div class="form-group">
@@ -34,11 +38,6 @@
           <div class="form-group">
             <label>个性签名</label>
             <textarea v-model="form.bio" placeholder="介绍一下自己..." rows="3"></textarea>
-          </div>
-
-          <div class="form-group">
-            <label>邮箱</label>
-            <input type="email" v-model="form.email" placeholder="example@email.com" />
           </div>
 
           <div class="btn-group">
@@ -56,72 +55,86 @@
 <script setup>
 import { reactive, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { useUserStore } from '@/stores/user';
+import { updateUserInfo, uploadAvatar } from '@/api/chat'; // 引入API
 
 const router = useRouter();
+const userStore = useUserStore();
 const loading = ref(false);
 const fileInput = ref(null);
 
-// 表单数据
 const form = reactive({
   id: null,
-  username: '',
   nickname: '',
   bio: '',
   email: '',
-  avatar: '' // 实际项目中这里是图片URL
+  avatar: ''
 });
 
-// 初始化加载数据
+// 初始化：从 Store 中加载数据到表单
 onMounted(() => {
-  // 模拟从后端/本地存储获取当前用户信息
-  // const user = JSON.parse(localStorage.getItem('userInfo'));
-  
-  // 模拟数据
-  form.id = 1;
-  form.username = 'admin001';
-  form.nickname = '我的账号';
-  form.bio = '写代码是一件快乐的事情。';
-  form.email = 'admin@test.com';
-  // form.avatar = 'https://via.placeholder.com/100'; // 测试图片
+  const currentUser = userStore.userInfo;
+  if (currentUser) {
+    form.id = currentUser.id;
+    form.nickname = currentUser.nickname || '';
+    form.bio = currentUser.bio || '';
+    form.email = currentUser.email || '';
+    form.avatar = currentUser.avatar || '';
+  }
 });
 
-// 返回聊天页
 const goBack = () => {
   router.push('/chat');
 };
 
-// 触发文件选择
 const triggerFileUpload = () => {
   fileInput.value.click();
 };
 
-// 处理文件选择（这里仅做前端预览逻辑，实际需上传到后端）
-const handleFileChange = (e) => {
+// 处理文件选择并上传
+const handleFileChange = async (e) => {
   const file = e.target.files[0];
-  if (file) {
-    // 创建本地预览URL
-    form.avatar = URL.createObjectURL(file);
-    // TODO: 调用后端上传接口 uploadAvatar(file)
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    // 1. 上传文件
+    const res = await uploadAvatar(formData);
+    if (res.code === 200) {
+      // 2. 上传成功，回显图片 URL
+      form.avatar = res.url;
+    } else {
+      alert('图片上传失败: ' + res.msg);
+    }
+  } catch (error) {
+    console.error(error);
+    alert('上传出错');
   }
 };
 
-// 保存信息
+// 保存所有信息
 const handleSave = async () => {
   loading.value = true;
   try {
-    // 模拟API请求
-    console.log('提交更新:', form);
+    // 1. 调用更新接口
+    const res = await updateUserInfo(form);
     
-    // 模拟延迟
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    alert('保存成功！');
-    // 更新本地存储的用户信息
-    // localStorage.setItem('userInfo', JSON.stringify(form));
-    
-    goBack();
+    if (res.code === 200) {
+      alert('保存成功！');
+      
+      // 2. 关键步骤：更新 Pinia Store 和 LocalStorage
+      // 这样 Chat 页面不需要刷新就能看到新头像和昵称
+      userStore.setUser(res.userInfo);
+      
+      goBack();
+    } else {
+      alert('保存失败: ' + res.msg);
+    }
   } catch (error) {
-    alert('保存失败，请重试');
+    console.error(error);
+    alert('保存请求异常');
   } finally {
     loading.value = false;
   }
