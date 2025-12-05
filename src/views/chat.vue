@@ -73,7 +73,7 @@
 import { ref, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
-import { getContacts } from '@/api/chat'; 
+import { getContacts, getHistory } from '@/api/chat';
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -129,14 +129,26 @@ const loadContacts = async () => {
     }
 }
 
-const selectContact = (user) => {
+const selectContact = async (user) => {
   currentContact.value = user;
-  messages.value = [
-    // 修复点4：使用 nickname
-    { id: 1, content: `Hi, I am ${user.nickname}`, isMine: false },
-    { id: 2, content: 'Hello there!', isMine: true }
-  ];
-  scrollToBottom();
+  messages.value = []; // 先清空，防止显示上一个人的消息
+
+  try {
+    // 调用后端接口获取历史记录
+    const res = await getHistory(user.id);
+    if (res.code === 200) {
+      // 转换数据格式以适配前端渲染
+      messages.value = res.data.map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        // 判断这条消息是不是我发的
+        isMine: String(msg.senderId) === String(userStore.userInfo.id)
+      }));
+      scrollToBottom();
+    }
+  } catch (error) {
+    console.error("加载历史消息失败", error);
+  }
 };
 
 const sendMessage = () => {
