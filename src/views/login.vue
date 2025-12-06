@@ -2,7 +2,7 @@
   <div class="login-container">
     <div class="login-card">
       <h2 class="title">Welcome Back</h2>
-      <p class="subtitle">登录即时通讯系统</p>
+      <p class="subtitle">登录XChat</p>
       
       <form @submit.prevent="handleLogin" class="login-form">
         <div class="form-group">

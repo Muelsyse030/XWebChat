@@ -21,15 +21,19 @@ api.interceptors.response.use(
 // 原有接口
 export const loginUser = (data) => api.post('/login', data);
 export const registerUser = (data) => api.post('/register', data);
-export const getContacts = () => api.get('/contacts');
 export const getHistory = (contactId) => api.get(`/messages?contactId=${contactId}`);
 
-// 【新增】上传头像接口 (你之前漏掉了这个)
+// 上传头像接口
 export const uploadAvatar = (formData) => api.post('/user/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
 });
+//获取好友列表接口
+export const getContacts = () => api.get('/friends');
 
-// 【新增】更新用户信息接口 (Profile页面也需要这个)
+//更新用户信息接口
 export const updateUserInfo = (user) => api.post('/user/update', user);
+
+//添加好友接口
+export const addFriend = (email) => api.post('/friends/add', { email });
 
 export default api;

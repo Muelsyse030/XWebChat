@@ -1,27 +1,28 @@
 <template>
   <div class="chat-background">
-    
     <div class="chat-card">
       
       <aside class="sidebar">
         <div class="user-profile" @click="goToProfile" title="点击修改个人信息">
-          <img 
-            v-if="userStore.userInfo.avatar" 
-            :src="userStore.userInfo.avatar" 
-            class="avatar" 
-            style="object-fit: cover;" 
-          />
+          <img v-if="userStore.userInfo.avatar" :src="userStore.userInfo.avatar" class="avatar" style="object-fit: cover;" />
           <div v-else class="avatar">
             {{ userStore.userInfo.nickname ? userStore.userInfo.nickname.charAt(0).toUpperCase() : 'Me' }}
           </div>
-
           <div class="user-info-text">
             <span class="username">{{ userStore.userInfo.nickname || '我的账号' }}</span>
             <span class="status-text">● 在线</span>
           </div>
         </div>
         
+        <div class="add-friend-bar">
+          <span class="section-title">好友列表</span>
+          <button class="btn-add" @click="openAddFriend" title="添加好友">+</button>
+        </div>
+
         <div class="contact-list">
+          <div v-if="contacts.length === 0" class="no-contacts">
+            暂无好友，点击 "+" 添加
+          </div>
           <div 
             v-for="user in contacts" 
             :key="user.id" 
@@ -29,19 +30,13 @@
             :class="{ active: currentContact?.id === user.id }"
             @click="selectContact(user)"
           >
-            <img 
-              v-if="user.avatar" 
-              :src="user.avatar" 
-              class="avatar-small" 
-              style="object-fit: cover;" 
-            />
+            <img v-if="user.avatar" :src="user.avatar" class="avatar-small" style="object-fit: cover;" />
             <div v-else class="avatar-small">
               {{ user.nickname ? user.nickname.charAt(0).toUpperCase() : 'U' }}
             </div>
-
             <div class="info">
               <div class="name">{{ user.nickname }}</div>
-              <div class="last-msg">点击开始聊天...</div>
+              <div class="status-dot" :class="{ online: user.online }"></div>
             </div>
           </div>
         </div>
@@ -52,7 +47,6 @@
           <header class="chat-header">
             <div class="header-name-wrapper">
               <h3>{{ currentContact.nickname }}</h3>
-              
               <span class="status-badge" :class="{ 'is-online': currentContact.online }">
                 {{ currentContact.online ? '● 在线' : '● 离线' }}
               </span>
@@ -60,33 +54,21 @@
           </header>
 
           <div class="message-list" ref="msgContainer">
-            <div 
-              v-for="msg in messages" 
-              :key="msg.id" 
-              class="message-row"
-              :class="{ 'mine': msg.isMine }"
-            >
-              <div class="bubble">
-                {{ msg.content }}
-              </div>
+            <div v-for="msg in messages" :key="msg.id" class="message-row" :class="{ 'mine': msg.isMine }">
+              <div class="bubble">{{ msg.content }}</div>
+              <span class="msg-time">{{ formatTime(msg.createdAt) }}</span>
             </div>
           </div>
 
           <div class="input-area">
-            <textarea 
-              v-model="inputContent" 
-              placeholder="输入消息..." 
-              @keydown.enter.prevent="sendMessage"
-            ></textarea>
-            <button @click="sendMessage">
-              <span class="send-icon">➤</span>
-            </button>
+            <textarea v-model="inputContent" placeholder="输入消息..." @keydown.enter.prevent="sendMessage"></textarea>
+            <button @click="sendMessage"><span class="send-icon">➤</span></button>
           </div>
         </template>
 
         <div v-else class="empty-state">
-          <div class="empty-icon">💬</div>
-          <p>选择一个联系人开始聊天</p>
+          <div class="empty-icon">👋</div>
+          <p>选择一个好友开始聊天</p>
         </div>
       </main>
       
@@ -98,7 +80,7 @@
 import { ref, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
-import { getContacts, getHistory } from '@/api/chat';
+import { getContacts, getHistory, addFriend } from '@/api/chat'; // 引入 addFriend
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -110,112 +92,103 @@ const messages = ref([]);
 const inputContent = ref('');
 const msgContainer = ref(null);
 
+// 初始化 WebSocket (保持不变)
 const initWebSocket = () => {
   const token = userStore.token; 
-  if (!token) {
-      alert("未登录");
-      router.push('/login');
-      return;
-  }
-
+  if (!token) { router.push('/login'); return; }
   socket = new WebSocket(`ws://localhost:8080/ws/chat?token=${token}`);
-
-  socket.onopen = () => {
-    console.log('WebSocket 连接成功');
-  };
-
+  socket.onopen = () => { console.log('WS Connected'); };
   socket.onmessage = (event) => {
     const msg = JSON.parse(event.data);
-    
-    const isCurrentChat = currentContact.value && 
-                          (String(msg.senderId) === String(currentContact.value.id));
-    
-    if (isCurrentChat || msg.senderId === String(userStore.userInfo.id)) {
+
+    const isCurrentChat = currentContact.value && (String(msg.senderId) === String(currentContact.value.id));
+    if (isCurrentChat || String(msg.senderId) === String(userStore.userInfo.id)) {
          messages.value.push({
           id: Date.now(),
           content: msg.content,
-          isMine: String(msg.senderId) === String(userStore.userInfo.id)
+          isMine: String(msg.senderId) === String(userStore.userInfo.id),
+          createdAt: msg.createdAt || new Date() // 【新增】接收时间
         });
         scrollToBottom();
     }
   };
-  
-  socket.onclose = () => { console.log('连接断开'); };
 };
 
+// 加载好友列表
 const loadContacts = async () => {
     try {
-        const res = await getContacts();
+        const res = await getContacts(); // 现在调用的是 /api/friends
         if (res.code === 200) {
-            contacts.value = res.data.filter(u => u.id !== userStore.userInfo.id);
+            contacts.value = res.data;
         }
     } catch (e) {
-        console.error("加载联系人失败", e);
+        console.error("加载好友失败", e);
     }
 }
 
+// 【新增】添加好友逻辑
+const openAddFriend = async () => {
+  const email = prompt("请输入好友的邮箱地址：");
+  if (email) {
+    if (email === userStore.userInfo.email) {
+      alert("不能添加自己为好友");
+      return;
+    }
+    try {
+      const res = await addFriend(email);
+      if (res.code === 200) {
+        alert("添加成功！");
+        loadContacts(); // 刷新列表
+      } else {
+        alert(res.msg);
+      }
+    } catch (e) {
+      alert("请求失败，请检查邮箱是否正确");
+    }
+  }
+};
+
 const selectContact = async (user) => {
   currentContact.value = user;
-  messages.value = []; // 先清空，防止显示上一个人的消息
-
+  messages.value = [];
   try {
-    // 调用后端接口获取历史记录
     const res = await getHistory(user.id);
     if (res.code === 200) {
-      // 转换数据格式以适配前端渲染
       messages.value = res.data.map(msg => ({
         id: msg.id,
         content: msg.content,
-        // 判断这条消息是不是我发的
         isMine: String(msg.senderId) === String(userStore.userInfo.id)
       }));
       scrollToBottom();
     }
-  } catch (error) {
-    console.error("加载历史消息失败", error);
-  }
+  } catch (error) { messages.value = []; }
 };
 
 const sendMessage = () => {
   if (!inputContent.value.trim() || !socket) return;
-  
-  const msgObj = {
-    receiverId: currentContact.value.id,
-    content: inputContent.value
-  };
-  
+  const msgObj = { receiverId: currentContact.value.id, content: inputContent.value };
   socket.send(JSON.stringify(msgObj));
-  
-  messages.value.push({
-    id: Date.now(),
-    content: inputContent.value,
-    isMine: true
-  });
-  
+  messages.value.push({ id: Date.now(), content: inputContent.value, isMine: true });
   inputContent.value = '';
   scrollToBottom();
 };
 
-const goToProfile = () => {
-  router.push('/profile');
-};
-
-const scrollToBottom = () => {
-  nextTick(() => {
-    if (msgContainer.value) {
-      msgContainer.value.scrollTop = msgContainer.value.scrollHeight;
-    }
-  });
-};
+const goToProfile = () => { router.push('/profile'); };
+const scrollToBottom = () => { nextTick(() => { if (msgContainer.value) msgContainer.value.scrollTop = msgContainer.value.scrollHeight; }); };
 
 onMounted(() => {
-    if (!userStore.token) {
-        router.push('/login');
-        return;
-    }
+    if (!userStore.token) { router.push('/login'); return; }
     loadContacts(); 
     initWebSocket(); 
 });
+
+const formatTime = (timeStr) => {
+  if (!timeStr) return '';
+  const date = new Date(timeStr);
+  // 返回简单的 "10:30" 格式
+  return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+};
+
 </script>
 
 <style scoped>
@@ -459,6 +432,26 @@ textarea:focus {
   background-color: #f6ffed;
   color: #52c41a; 
   */
+}
+/* 添加好友栏样式 */
+.add-friend-bar { padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f0f0f0; }
+.section-title { font-size: 12px; color: #999; font-weight: 600; }
+.btn-add { background: #f0f0f0; border: none; width: 24px; height: 24px; border-radius: 50%; color: #666; cursor: pointer; font-size: 16px; line-height: 1; display: flex; justify-content: center; align-items: center; transition: all 0.2s; }
+.btn-add:hover { background: #4a90e2; color: white; }
+
+.message-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.message-row.mine .message-content-wrapper {
+  align-items: flex-end; /* 自己发的消息靠右对齐 */
+}
+.msg-time {
+  font-size: 10px;
+  color: #999;
+  margin-top: 4px;
+  margin-left: 5px;
 }
 
 /* 滚动条 */
