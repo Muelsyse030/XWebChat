@@ -55,13 +55,23 @@
 
           <div class="message-list" ref="msgContainer">
             <div v-for="msg in messages" :key="msg.id" class="message-row" :class="{ 'mine': msg.isMine }">
-              <div class="bubble">{{ msg.content }}</div>
+              <div class="bubble">
+                <img 
+                  v-if="msg.content.startsWith('img:')" 
+                  :src="msg.content.substring(4)" 
+                  style="max-width: 200px; border-radius: 8px; cursor: pointer;" 
+                  @click="window.open(msg.content.substring(4))"
+                  />
+                  <span v-else>{{ msg.content }}</span>
+                </div>
               <span class="msg-time">{{ formatTime(msg.createdAt) }}</span>
             </div>
           </div>
 
           <div class="input-area">
             <textarea v-model="inputContent" placeholder="输入消息..." @keydown.enter.prevent="sendMessage"></textarea>
+            <input type="file" ref="imgInput" style="display:none" accept="image/*" @change="handleSendImage" />
+            <button class="btn-icon" @click="$refs.imgInput.click()" title="发送图片">🖼️</button>
             <button @click="sendMessage"><span class="send-icon">➤</span></button>
           </div>
         </template>
@@ -80,7 +90,7 @@
 import { ref, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
-import { getContacts, getHistory, addFriend } from '@/api/chat'; // 引入 addFriend
+import { getContacts, getHistory, addFriend , uploadAvatar } from '@/api/chat'; // 引入 addFriend
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -189,6 +199,40 @@ const formatTime = (timeStr) => {
   return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
 };
 
+const handleSendImage = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    // 1. 先把图片上传到服务器
+    const res = await uploadAvatar(formData);
+    if (res.code === 200) {
+      // 2. 拿到图片URL，拼接特殊前缀 "img:" 发送给 WebSocket
+      const imgMsg = `img:${res.url}`;
+      
+      const msgObj = {
+        receiverId: currentContact.value.id,
+        content: imgMsg
+      };
+      socket.send(JSON.stringify(msgObj));
+
+      // 3. 自己界面上也显示出来
+      messages.value.push({
+        id: Date.now(),
+        content: imgMsg,
+        isMine: true,
+        createdAt: new Date()
+      });
+      scrollToBottom();
+    }
+  } catch (error) {
+    console.error("发图失败", error);
+  }
+};
+
 </script>
 
 <style scoped>
@@ -217,6 +261,8 @@ const formatTime = (timeStr) => {
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08); /* 柔和的悬浮阴影 */
   display: flex;         /* 左右布局 */
   overflow: hidden;      /* 关键：防止内部元素溢出圆角 */
+  background: rgba(255, 255, 255, 0.95); 
+  backdrop-filter: blur(10px); /* 毛玻璃特效 */
 }
 
 /* =========================================
