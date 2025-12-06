@@ -46,6 +46,11 @@
               {{ loading ? '保存中...' : '保存修改' }}
             </button>
           </div>
+
+          <div class="logout-section">
+            <button type="button" class="btn-logout" @click="handleLogout">退出登录</button>
+          </div>
+
         </form>
       </div>
     </div>
@@ -57,6 +62,7 @@ import { reactive, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { updateUserInfo, uploadAvatar } from '@/api/chat'; // 引入API
+import { ElMessage, ElMessageBox } from 'element-plus';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -100,17 +106,16 @@ const handleFileChange = async (e) => {
   formData.append('file', file);
 
   try {
-    // 1. 上传文件
     const res = await uploadAvatar(formData);
     if (res.code === 200) {
-      // 2. 上传成功，回显图片 URL
       form.avatar = res.url;
+      ElMessage.success('头像上传成功'); // 替换 alert
     } else {
-      alert('图片上传失败: ' + res.msg);
+      ElMessage.error('图片上传失败: ' + res.msg);
     }
   } catch (error) {
     console.error(error);
-    alert('上传出错');
+    ElMessage.error('上传出错');
   }
 };
 
@@ -118,26 +123,40 @@ const handleFileChange = async (e) => {
 const handleSave = async () => {
   loading.value = true;
   try {
-    // 1. 调用更新接口
     const res = await updateUserInfo(form);
-    
     if (res.code === 200) {
-      alert('保存成功！');
-      
-      // 2. 关键步骤：更新 Pinia Store 和 LocalStorage
-      // 这样 Chat 页面不需要刷新就能看到新头像和昵称
+      ElMessage.success('保存成功！'); // 替换 alert
       userStore.setUser(res.userInfo);
-      
       goBack();
     } else {
-      alert('保存失败: ' + res.msg);
+      ElMessage.error('保存失败: ' + res.msg);
     }
   } catch (error) {
     console.error(error);
-    alert('保存请求异常');
+    ElMessage.error('保存请求异常');
   } finally {
     loading.value = false;
   }
+};
+
+const handleLogout = () => {
+  ElMessageBox.confirm(
+    '确定要退出登录吗？',
+    '提示',
+    {
+      confirmButtonText: '确定退出',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  )
+    .then(() => {
+      userStore.logout(); // 清除 Pinia 和 LocalStorage
+      ElMessage.success('已退出登录');
+      router.push('/login'); // 跳转回登录页
+    })
+    .catch(() => {
+      // 用户点击取消，不做操作
+    });
 };
 </script>
 
@@ -320,6 +339,23 @@ button {
 .btn-save:disabled {
   background: #a0cfff;
   cursor: not-allowed;
+}
+
+.logout-section {
+  margin-top: 20px;
+  border-top: 1px solid #eee;
+  padding-top: 20px;
+}
+.btn-logout {
+  width: 100%;
+  background-color: #fff1f0;
+  color: #ff4d4f;
+  border: 1px solid #ffa39e;
+}
+.btn-logout:hover {
+  background-color: #ff4d4f;
+  color: white;
+  border-color: #ff4d4f;
 }
 
 button:hover:not(:disabled) {
