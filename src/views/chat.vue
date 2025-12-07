@@ -20,24 +20,24 @@
         </div>
 
         <div class="contact-list">
-  <div 
-    v-for="user in contacts" 
-    :key="user.id" 
-    class="contact-item"
-    :class="{ active: currentContact?.id === user.id }"
-    @click="selectContact(user)"
-  >
-    <div class="avatar-wrapper-sidebar">
-      <img v-if="user.avatar" :src="user.avatar" class="avatar-small" style="object-fit: cover;" />
-      <div v-else class="avatar-small">
-        {{ user.nickname ? user.nickname.charAt(0).toUpperCase() : 'U' }}
-      </div>
+        <div 
+          v-for="user in contacts" 
+          :key="user.id" 
+          class="contact-item"
+          :class="{ active: currentContact?.id === user.id }"
+          @click="selectContact(user)"
+        >
+        <div class="avatar-wrapper-sidebar">
+        <img v-if="user.avatar" :src="user.avatar" class="avatar-small" style="object-fit: cover;" />
+        <div v-else class="avatar-small">
+          {{ user.nickname ? user.nickname.charAt(0).toUpperCase() : 'U' }}
+        </div>
       
-      <div v-if="user.unread > 0" class="unread-badge">
-        {{ user.unread > 99 ? '99+' : user.unread }}
-      </div>
-    </div>
-    <div class="info">
+        <div v-if="user.unread > 0" class="unread-badge">
+          {{ user.unread > 99 ? '99+' : user.unread }}
+        </div>
+        </div>
+        <div class="info">
       <div class="name">{{ user.nickname }}</div>
       <div class="status-dot" :class="{ online: user.online }"></div>
     </div>
@@ -94,6 +94,7 @@ import { ref, onMounted, nextTick , onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { getContacts, getHistory, addFriend , uploadAvatar } from '@/api/chat'; // 引入 addFriend
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -153,25 +154,33 @@ const loadContacts = async () => {
 }
 
 // 【新增】添加好友逻辑
-const openAddFriend = async () => {
-  const email = prompt("请输入好友的邮箱地址：");
-  if (email) {
-    if (email === userStore.userInfo.email) {
-      alert("不能添加自己为好友");
-      return;
-    }
-    try {
-      const res = await addFriend(email);
-      if (res.code === 200) {
-        alert("添加成功！");
-        loadContacts(); // 刷新列表
-      } else {
-        alert(res.msg);
+const openAddFriend = () => {
+  ElMessageBox.prompt('请输入好友的邮箱地址', '添加好友', {
+    confirmButtonText: '添加',
+    cancelButtonText: '取消',
+    inputPattern: /.+/, // 简单校验非空
+    inputErrorMessage: '邮箱不能为空',
+  })
+    .then(async ({ value }) => {
+      if (value === userStore.userInfo.email) {
+        ElMessage.warning('不能添加自己为好友');
+        return;
       }
-    } catch (e) {
-      alert("请求失败，请检查邮箱是否正确");
-    }
-  }
+      try {
+        const res = await addFriend(value);
+        if (res.code === 200) {
+          ElMessage.success('添加成功！');
+          loadContacts();
+        } else {
+          ElMessage.error(res.msg);
+        }
+      } catch (e) {
+        ElMessage.error('请求失败，请检查邮箱是否正确');
+      }
+    })
+    .catch(() => {
+      // 取消输入
+    });
 };
 
 const selectContact = async (user) => {
