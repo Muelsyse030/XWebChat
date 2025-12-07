@@ -20,26 +20,29 @@
         </div>
 
         <div class="contact-list">
-          <div v-if="contacts.length === 0" class="no-contacts">
-            暂无好友，点击 "+" 添加
-          </div>
-          <div 
-            v-for="user in contacts" 
-            :key="user.id" 
-            class="contact-item"
-            :class="{ active: currentContact?.id === user.id }"
-            @click="selectContact(user)"
-          >
-            <img v-if="user.avatar" :src="user.avatar" class="avatar-small" style="object-fit: cover;" />
-            <div v-else class="avatar-small">
-              {{ user.nickname ? user.nickname.charAt(0).toUpperCase() : 'U' }}
-            </div>
-            <div class="info">
-              <div class="name">{{ user.nickname }}</div>
-              <div class="status-dot" :class="{ online: user.online }"></div>
-            </div>
-          </div>
-        </div>
+  <div 
+    v-for="user in contacts" 
+    :key="user.id" 
+    class="contact-item"
+    :class="{ active: currentContact?.id === user.id }"
+    @click="selectContact(user)"
+  >
+    <div class="avatar-wrapper-sidebar">
+      <img v-if="user.avatar" :src="user.avatar" class="avatar-small" style="object-fit: cover;" />
+      <div v-else class="avatar-small">
+        {{ user.nickname ? user.nickname.charAt(0).toUpperCase() : 'U' }}
+      </div>
+      
+      <div v-if="user.unread > 0" class="unread-badge">
+        {{ user.unread > 99 ? '99+' : user.unread }}
+      </div>
+    </div>
+    <div class="info">
+      <div class="name">{{ user.nickname }}</div>
+      <div class="status-dot" :class="{ online: user.online }"></div>
+    </div>
+  </div>
+</div>
       </aside>
 
       <main class="chat-area">
@@ -87,7 +90,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick , onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { getContacts, getHistory, addFriend , uploadAvatar } from '@/api/chat'; // 引入 addFriend
@@ -112,15 +115,28 @@ const initWebSocket = () => {
     const msg = JSON.parse(event.data);
 
     const isCurrentChat = currentContact.value && (String(msg.senderId) === String(currentContact.value.id));
-    if (isCurrentChat || String(msg.senderId) === String(userStore.userInfo.id)) {
+    
+
+    const isMyMessage = String(msg.senderId) === String(userStore.userInfo.id);
+
+    if (isCurrentChat || isMyMessage) {
+         // 如果正在和他聊天，或者消息是我发的，直接上屏
          messages.value.push({
           id: Date.now(),
           content: msg.content,
-          isMine: String(msg.senderId) === String(userStore.userInfo.id),
-          createdAt: msg.createdAt || new Date() // 【新增】接收时间
+          isMine: isMyMessage,
+          createdAt: msg.createdAt || new Date()
         });
         scrollToBottom();
-    }
+      }
+      else {
+        // 【新增】如果不是当前聊天对象，且不是自己发的消息 -> 找到对应的好友，未读数 +1
+        const targetUser = contacts.value.find(u => String(u.id) === String(msg.senderId));
+        if (targetUser) {
+            // 如果 unread 属性不存在，初始化为 0，然后 +1
+            targetUser.unread = (targetUser.unread || 0) + 1;
+        }
+      }
   };
 };
 
@@ -160,7 +176,9 @@ const openAddFriend = async () => {
 
 const selectContact = async (user) => {
   currentContact.value = user;
+  user.unread = 0;
   messages.value = [];
+
   try {
     const res = await getHistory(user.id);
     if (res.code === 200) {
@@ -190,6 +208,13 @@ onMounted(() => {
     if (!userStore.token) { router.push('/login'); return; }
     loadContacts(); 
     initWebSocket(); 
+});
+
+onUnmounted(() => {
+  if (socket) {
+    socket.close();
+    console.log('WebSocket 连接已关闭');
+  }
 });
 
 const formatTime = (timeStr) => {
@@ -498,6 +523,45 @@ textarea:focus {
   color: #999;
   margin-top: 4px;
   margin-left: 5px;
+}
+/* 给头像加一个相对定位的父容器，方便红点定位 */
+.avatar-wrapper-sidebar {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+/* 保持原有 avatar-small 样式，确保它填满父容器 */
+.avatar-small {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  /* 之前的 background 等属性保留 */
+  display: flex; 
+  justify-content: center; 
+  align-items: center; 
+  font-size: 14px;
+}
+
+/* 【新增】小红点样式 */
+.unread-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background-color: #ff4d4f; /* 鲜艳的红色 */
+  color: white;
+  font-size: 10px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 10px; /* 胶囊形状 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 4px;
+  border: 2px solid white; /* 加个白边，在头像上更清晰 */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  font-weight: bold;
+  z-index: 10;
 }
 
 /* 滚动条 */

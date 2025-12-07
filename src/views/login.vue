@@ -32,6 +32,7 @@ import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { loginUser } from '@/api/chat'; // 引入 API
 import { useUserStore } from '@/stores/user'; // 引入 Pinia
+import { ElMessage } from 'element-plus';
 
 const router = useRouter();
 const userStore = useUserStore(); // 使用 store
@@ -56,15 +57,15 @@ const handleLogin = async () => {
         // 2. 保存 Token 和用户信息到 Pinia/LocalStorage
         userStore.setToken(res.token);
         userStore.setUser(res.userInfo);
-        
         console.log('登录成功', res.userInfo);
+        ElMessage.success('登录成功，欢迎回来！'); // 替换 alert
         router.push('/chat'); 
     } else {
-        alert(res.msg || '登录失败');
+        ElMessage.error(res.msg || '登录失败'); // 替换 alert
     }
   } catch (error) {
     console.error(error);
-    alert('登录请求失败');
+    ElMessage.error('登录请求失败，请检查网络'); // 替换 alert
   } finally {
     loading.value = false;
   }
