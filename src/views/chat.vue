@@ -72,11 +72,34 @@
           </div>
 
           <div class="input-area">
-            <textarea v-model="inputContent" placeholder="输入消息..." @keydown.enter.prevent="sendMessage"></textarea>
-            <input type="file" ref="imgInput" style="display:none" accept="image/*" @change="handleSendImage" />
-            <button class="btn-icon" @click="$refs.imgInput.click()" title="发送图片">🖼️</button>
-            <button @click="sendMessage"><span class="send-icon">➤</span></button>
-          </div>
+  
+  <div v-if="showEmojiPicker" class="emoji-picker-panel">
+    <span 
+      v-for="emoji in emojiList" 
+      :key="emoji" 
+      class="emoji-item" 
+      @click="addEmoji(emoji)"
+    >
+      {{ emoji }}
+    </span>
+  </div>
+
+  <textarea 
+    v-model="inputContent" 
+    placeholder="输入消息..." 
+    @keydown.enter.prevent="sendMessage"
+  ></textarea>
+  
+  <input type="file" ref="imgInput" style="display:none" accept="image/*" @change="handleSendImage" />
+  
+  <button class="btn-icon" @click="showEmojiPicker = !showEmojiPicker" title="发送表情">😊</button>
+  
+  <button class="btn-icon" @click="$refs.imgInput.click()" title="发送图片">🖼️</button>
+  
+  <button @click="sendMessage">
+    <span class="send-icon">➤</span>
+  </button>
+</div>
         </template>
 
         <div v-else class="empty-state">
@@ -105,6 +128,23 @@ const currentContact = ref(null);
 const messages = ref([]);
 const inputContent = ref('');
 const msgContainer = ref(null);
+const showEmojiPicker = ref(false);
+
+const emojiList = [
+  '😀', '😁', '😂', '🤣', '😃', '😄', '😅', '😆', '😉', '😊', '😋', '😎', 
+  '😍', '😘', '🥰', '😗', '😙', '😚', '🙂', '🤗', '🤩', '🤔', '🤨', '😐', 
+  '😑', '😶', '🙄', '😏', '😣', '😥', '😮', '🤐', '😯', '😪', '😫', '😴', 
+  '😌', '😛', '😜', '😝', '🤤', '😒', '😓', '😔', '😕', '🙃', '🤑', '😲', 
+  '☹️', '🙁', '😖', '😞', '😟', '😤', '😢', '😭', '😦', '😧', '😨', '😩', 
+  '🤯', '😬', '😰', '😱', '🥵', '🥶', '😳', '🤪', '😵', '😡', '😠', '🤬', 
+  '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '😇', '🥳', '🥺', '🤠', '🤡', '🤥', 
+  '🤫', '🤭', '🧐', '🤓', '😈', '👿', '👹', '👺', '💀', '👻', '👽', '🤖', 
+  '💩', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾', '👍', '👎', 
+  '👊', '👌', '🤝', '🙏', '💪', '💅', '🌹', '🥀', '💐', '💔', '❤️', '🧡'
+];
+const addEmoji = (emoji) => {
+  inputContent.value += emoji;
+};
 
 // 初始化 WebSocket (保持不变)
 const initWebSocket = () => {
@@ -265,16 +305,13 @@ const handleSendImage = async (e) => {
   } catch (error) {
     console.error("发图失败", error);
   }
+  
+  
 };
 
 </script>
 
 <style scoped>
-/* =========================================
-   1. 布局核心：悬浮卡片实现
-   ========================================= */
-
-/* 最外层背景：铺满屏幕，灰色背景，Flex居中 */
 .chat-background {
   width: 100%;
   height: 100vh;
@@ -310,7 +347,6 @@ const handleSendImage = async (e) => {
   flex-direction: column;
 }
 
-/* 个人信息头部 */
 .user-profile {
   padding: 25px 20px;
   display: flex;
@@ -445,6 +481,7 @@ const handleSendImage = async (e) => {
   gap: 15px;
   background: white;
   align-items: center;
+  position: relative; /* 【新增】关键属性 */
 }
 
 textarea {
@@ -571,6 +608,49 @@ textarea:focus {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   font-weight: bold;
   z-index: 10;
+}
+
+.emoji-picker-panel {
+  position: absolute;
+  bottom: 80px; /* 距离底部的高度，根据输入框高度调整 */
+  left: 20px;
+  width: 300px;
+  height: 200px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+  padding: 10px;
+  overflow-y: auto; /* 超出高度滚动 */
+  display: flex;
+  flex-wrap: wrap; /* 自动换行 */
+  gap: 5px;
+  z-index: 100; /* 保证在最上层 */
+}
+
+/* 【新增】单个表情样式 */
+.emoji-item {
+  font-size: 22px;
+  padding: 5px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.2s;
+  user-select: none;
+}
+
+.emoji-item:hover {
+  background-color: #f0f0f0;
+  transform: scale(1.2); /* 悬浮放大效果 */
+}
+
+/* 优化一下滚动条，让表情面板更好看 */
+.emoji-picker-panel::-webkit-scrollbar {
+  width: 4px;
+}
+.emoji-picker-panel::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 2px;
 }
 
 /* 滚动条 */
